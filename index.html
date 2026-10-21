@@ -133,6 +133,19 @@
   .modal-card{background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:20px; width:340px; max-width:calc(100vw - 32px);}
   .modal-card h3{margin:0 0 8px; font-size:16px; display:flex; align-items:center; justify-content:space-between;}
   .auth-err{color:#d24b4b; font-size:12px; min-height:16px; margin:2px 0 8px;}
+  /* 视图横幅：我的版本 / 分享版本 */
+  .view-banner{width:100%; margin:0 0 12px; padding:8px 12px; background:#fff7e6; border:1px solid #ffd591; border-radius:10px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:#7a4b00;}
+  .view-banner .vb-ico{font-size:16px;}
+  .view-banner .vb-txt{flex:1; min-width:200px; line-height:1.5;}
+  .view-banner .vb-btns{display:flex; gap:6px; flex-wrap:wrap;}
+  .view-banner .vb-btns .tool{padding:4px 8px; font-size:12px;}
+  /* 分享记录列表 */
+  .snap-head{font-size:12px; color:var(--muted); margin:14px 0 6px; font-weight:600;}
+  .snap-list{max-height:190px; overflow:auto; display:flex; flex-direction:column; gap:6px;}
+  .snap-row{display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fafcff;}
+  .snap-row .snap-id{font-family:ui-monospace,Consolas,monospace; color:#7a4b00; background:#fff3e0; padding:1px 6px; border-radius:6px;}
+  .snap-row .snap-meta{color:var(--muted); flex:1;}
+  .snap-row .tool{padding:3px 8px; font-size:12px;}
   @media(max-width:860px){
     .tables{flex-direction:column;}
     /* 纵向排列时，flex-basis:0 会让栏目高度塌成 0 → 表格不可见；改回按内容自适应 */
@@ -155,6 +168,7 @@
   </div>
 
   <div class="page">
+    <div class="view-banner" id="viewBanner" style="display:none"></div>
     <h1 class="doc-title">Irregular Verbs<span>不 规 则 动 词 表</span></h1>
     <div class="tables" id="tables"></div>
     <div class="hint">
@@ -228,15 +242,17 @@
     </div>
   </div>
 
-  <!-- 一键分享弹窗（复制链接失败时的回退） -->
+  <!-- 一键分享弹窗（含本机分享记录） -->
   <div class="modal" id="shareModal">
     <div class="modal-card" onclick="event.stopPropagation()">
-      <h3>分享链接 <button class="x" onclick="closeShare()">×</button></h3>
-      <p class="pmeta">已把当前内容写入本地 SQLite。复制下面的链接发给同学，对方打开即可看到你这份动词表（无需服务器）。</p>
+      <h3>分享 <button class="x" onclick="closeShare()">×</button></h3>
+      <p class="pmeta">复制链接发给同学，对方打开即可看到这份内容（数据在链接里，无需服务器）。打开分享<b>不会</b>改动你自己的版本。</p>
       <div class="field"><label>分享链接（已自动选中，Ctrl/⌘+C 复制）</label>
         <textarea id="shareUrl" rows="3" readonly onclick="this.select()"></textarea>
       </div>
       <button class="btn" onclick="copyShareUrl()">复制链接</button>
+      <div class="snap-head">分享记录（本机 · 按内容哈希存档，多个版本互不冲突）</div>
+      <div id="snapList" class="snap-list"></div>
     </div>
   </div>
 
@@ -252,34 +268,37 @@
   const SQL_LOCATE = f => 'vendor/sqljs/' + f;
   let CURRENT, voices = [], rate = 0.9, showAction = true, currentEl = null, speakToken = 0;
   let DB = null, SQL = null, storageMode = 'memory';   // 'sqlite' | 'local' | 'memory'
+  let VIEW = { kind:'mine', id:null };                 // 当前视图：'mine' 我的版本 | 'snap' 分享版本(id=内容哈希)
+  const BUILD = '20261021c';                           // 构建号（用于识别线上是否最新）
 
   function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
   /* ---------- 持久化：SQLite WASM (sql.js) + IndexedDB；失败回退 localStorage ---------- */
-  function idbGet(k){ return new Promise((res)=>{ try{
-    const r = indexedDB.open('nce1_db');
-    r.onupgradeneeded = ()=> r.result.createObjectStore('kv');
-    r.onsuccess = ()=>{ const db=r.result; try{
-      const tx=db.transaction('kv','readonly'); const rq=tx.objectStore('kv').get(k);
-      rq.onsuccess=()=>res(rq.result? rq.result.bytes : null); rq.onerror=()=>res(null);
-    }catch(e){ res(null); } };
-    r.onerror = ()=> res(null);
-  }catch(e){ res(null); } }); }
-  function idbSet(k, bytes){ return new Promise((res)=>{ try{
-    const r = indexedDB.open('nce1_db');
-    r.onupgradeneeded = ()=> r.result.createObjectStore('kv');
-    r.onsuccess = ()=>{ const db=r.result; try{
-      const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put({bytes}, k);
-      tx.oncomplete=()=>res(true); tx.onerror=()=>res(false);
-    }catch(e){ res(false); } };
-    r.onerror = ()=> res(false);
-  }catch(e){ res(false); } }); }
+  /* ---------- 持久化：SQLite WASM(我的版本) + IndexedDB(kv/meta/snapshots 快照仓库) ---------- */
+  const IDB_NAME='nce1_db', IDB_VER=2;
+  function idbOpen(){ return new Promise((res,rej)=>{ let r; try{ r=indexedDB.open(IDB_NAME, IDB_VER); }catch(e){ return rej(e); }
+    r.onupgradeneeded=(ev)=>{ const d=r.result;
+      if(!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta');
+      if(!d.objectStoreNames.contains('snapshots')) d.createObjectStore('snapshots');
+    };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  // kv：存 {bytes}（SQLite 我的版本）
+  async function idbKVGet(k){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('kv','readonly'); const rq=tx.objectStore('kv').get(k); rq.onsuccess=()=>res(rq.result? rq.result.bytes : null); rq.onerror=()=>res(null); }); }catch(e){ return null; } }
+  async function idbKVSet(k, bytes){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put({bytes}, k); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }); }catch(e){ return false; } }
+  // meta：存任意 JSON 值（视图指针等）
+  async function metaGet(k){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('meta','readonly'); const rq=tx.objectStore('meta').get(k); rq.onsuccess=()=>res(rq.result===undefined?null:rq.result); rq.onerror=()=>res(null); }); }catch(e){ return null; } }
+  async function metaSet(k,val){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('meta','readwrite'); tx.objectStore('meta').put(val,k); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }); }catch(e){ return false; } }
+  // snapshots：内容寻址快照仓库 {id, ts, data}
+  async function snapGet(id){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('snapshots','readonly'); const rq=tx.objectStore('snapshots').get(id); rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>res(null); }); }catch(e){ return null; } }
+  async function snapSet(rec){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('snapshots','readwrite'); tx.objectStore('snapshots').put(rec, rec.id); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }); }catch(e){ return false; } }
+  async function snapList(){ try{ const db=await idbOpen(); return await new Promise((res)=>{ const tx=db.transaction('snapshots','readonly'); const out=[]; const cur=tx.objectStore('snapshots').openCursor(null,'prev'); cur.onsuccess=(e)=>{ const c=e.target.result; if(c){ out.push(c.value); c.continue(); } }; tx.oncomplete=()=>res(out); }); }catch(e){ return []; } }
 
   async function initStorage(){
     try{
       if(typeof initSqlJs !== 'function') throw new Error('sql.js 未加载（离线？）');
       SQL = await initSqlJs({ locateFile: SQL_LOCATE });
-      const bytes = await idbGet('verbs_db');
+      const bytes = await idbKVGet('verbs_db');
       DB = new SQL.Database(bytes ? new Uint8Array(bytes) : undefined);
       DB.run("CREATE TABLE IF NOT EXISTS verbs(side TEXT, ord INTEGER, base TEXT, past TEXT, pp TEXT, zh TEXT);");
       storageMode = 'sqlite';
@@ -303,10 +322,11 @@
       const st = DB.prepare("INSERT INTO verbs(side,ord,base,past,pp,zh) VALUES(?,?,?,?,?,?);");
       ['L','R'].forEach(side=> data[side].forEach((a,ord)=> st.run([side,ord,a[0],a[1],a[2],a[3]||''])));
       st.free();
-      idbSet('verbs_db', DB.export());
+      idbKVSet('verbs_db', DB.export());
     }catch(e){ console.warn('saveToDB 失败：', e); }
   }
-  function loadData(){
+  /* ===== 我的版本（MINE）：唯一会被编辑写入的持久存储 ===== */
+  function loadMine(){
     if(FORCE_DEFAULT){ CURRENT = clone(DEFAULT_DATA); return; }
     if(storageMode==='sqlite' && DB){
       const d = loadFromDB();
@@ -315,9 +335,44 @@
     try{ const s = localStorage.getItem(KEY); if(s){ CURRENT = JSON.parse(s); return; } }catch(e){}
     CURRENT = clone(DEFAULT_DATA);
   }
-  function saveData(){
+  function saveMine(){
     if(storageMode==='sqlite' && DB){ saveToDB(CURRENT); }
     try{ localStorage.setItem(KEY, JSON.stringify(CURRENT)); }catch(e){}
+  }
+
+  /* ===== 分享快照：内容寻址仓库（按内容哈希生成稳定 id，类似 CDN 的 content-hash） ===== */
+  function snapId(data){ return sha256(JSON.stringify(data)).slice(0,12); }
+  function countOf(d){ return (d.L?d.L.length:0)+(d.R?d.R.length:0); }
+  // 打开一个分享快照为当前视图（绝不写入“我的版本”）
+  async function openSnapshot(data, persist){
+    const id = snapId(data);
+    VIEW = { kind:'snap', id };
+    CURRENT = clone(data);
+    if(persist){ try{ await snapSet({ id, ts:Date.now(), data:clone(data) }); }catch(e){} }
+    render();
+    toast('已载入分享版本 #'+id+'（'+countOf(data)+' 条）· 你的个人版本未被改动');
+  }
+  // 把当前（分享）视图保存为“我的版本”
+  function saveSnapshotAsMine(){
+    saveMine();
+    VIEW = { kind:'mine', id:null };
+    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+    render();
+    toast('已保存为我的版本，后续编辑只影响你的版本');
+  }
+  // 回到“我的版本”
+  function viewMine(){
+    VIEW = { kind:'mine', id:null };
+    loadMine();
+    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+    render();
+  }
+  // 编辑守卫：处于分享视图时，需先“保存为我的版本”，避免覆盖对方原始分享
+  function ensureEditable(){
+    if(VIEW.kind!=='snap') return true;
+    if(!confirm('你正在查看「分享版本」。\n要把它保存为“我的版本”后再编辑吗？（不会改动对方的原始分享）')) return false;
+    saveSnapshotAsMine();
+    return true;
   }
 
   const SKIP = '----';
@@ -353,13 +408,35 @@
       wrap.appendChild(col);
     });
     updateMeta();
+    showBanner();
+    // 保持当前搜索过滤与视图切换兼容
+    try{ const s=document.getElementById('search'); if(s) doSearch(s.value); }catch(e){}
+  }
+  // 视图横幅：明确告知正在看“我的版本”还是“分享版本”，避免误解/冲突
+  function showBanner(){
+    const el=document.getElementById('viewBanner'); if(!el) return;
+    if(VIEW.kind==='snap'){
+      el.style.display='flex';
+      el.innerHTML =
+        `<span class="vb-ico">📄</span>
+         <span class="vb-txt">正在查看<b>分享版本 #${VIEW.id}</b>（${countOf(CURRENT)} 条）。<b>你的个人版本已保留、未被改动。</b></span>
+         <span class="vb-btns">
+           <button class="tool" onclick="saveSnapshotAsMine()">💾 保存为我的版本</button>
+           <button class="tool" onclick="oneClickShare()">🔗 复制此分享</button>
+           <button class="tool" onclick="viewMine()">↩ 看我的版本</button>
+         </span>`;
+    } else {
+      el.style.display='none';
+      el.innerHTML='';
+    }
   }
 
   function updateMeta(){
     const total = CURRENT.L.length + CURRENT.R.length;
     const add = total - (DEFAULT_DATA.L.length + DEFAULT_DATA.R.length);
+    const viewTag = VIEW.kind==='snap' ? `　<span style="color:#b06a00">[分享版本 #${VIEW.id}]</span>` : '';
     document.getElementById('editMeta').innerHTML =
-      `当前共 <b>${total}</b> 条` + (add>0?`　（本次新增 <b style="color:var(--accent)">${add}</b> 条）`:'') +
+      `当前共 <b>${total}</b> 条` + (add>0?`　（相对原始表新增 <b style="color:var(--accent)">${add}</b> 条）`:'') + viewTag +
       `<br>左栏 ${CURRENT.L.length} 条 · 右栏 ${CURRENT.R.length} 条`;
   }
 
@@ -525,6 +602,7 @@
 
   /* ---------- add words ---------- */
   function addSingle(){
+    if(!ensureEditable()) return;
     const b=document.getElementById('n_base').value.trim();
     if(!b){ toast('请填写原形'); return; }
     const p=document.getElementById('n_past').value.trim()||b;
@@ -533,11 +611,12 @@
     const side=document.getElementById('n_side').value;
     const target = side==='auto' ? (CURRENT.L.length<=CURRENT.R.length?'L':'R') : side;
     CURRENT[target].push([b,p,pp,zh]);
-    saveData(); render();
+    saveMine(); render();
     ['n_base','n_past','n_pp','n_zh'].forEach(id=>document.getElementById(id).value='');
     toast(`已添加「${b}」到${target==='L'?'左':'右'}栏`);
   }
   function addBatch(){
+    if(!ensureEditable()) return;
     const txt=document.getElementById('n_batch').value.trim();
     if(!txt){ toast('请粘贴内容'); return; }
     let n=0;
@@ -549,17 +628,19 @@
       CURRENT[target].push([b,p,pp,zh]); n++;
     });
     if(n===0){ toast('未解析到有效数据'); return; }
-    saveData(); render();
+    saveMine(); render();
     document.getElementById('n_batch').value='';
     toast(`批量添加 ${n} 条`);
   }
   function resetData(){
+    if(!ensureEditable()) return;
     if(!confirm('确定要清空所有新增单词，恢复到原始表格吗？')) return;
     try{ localStorage.removeItem(KEY); }catch(e){}
-    CURRENT = clone(DEFAULT_DATA); saveData(); render();
+    CURRENT = clone(DEFAULT_DATA); saveMine(); render();
     toast('已恢复原始表格');
   }
   function importJson(){
+    if(!ensureEditable()) return;
     const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
     inp.onchange=()=>{
       const f=inp.files[0]; if(!f) return;
@@ -568,7 +649,7 @@
         try{
           const d=JSON.parse(r.result);
           if(!d.L||!d.R) throw 0;
-          CURRENT=d; saveData(); render(); toast('导入成功');
+          CURRENT=d; saveMine(); render(); toast('导入成功');
         }catch(e){ toast('JSON 格式不正确'); }
       };
       r.readAsText(f);
@@ -711,7 +792,7 @@
     clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
   }
 
-  /* ---------- 一键分享（纯静态：把当前数据编码进链接，接收方打开即载入本地 SQLite） ---------- */
+  /* ---------- 一键分享（纯静态：数据编码进链接；本地按内容哈希建快照仓库） ---------- */
   function b64urlEncode(str){
     const b = btoa(unescape(encodeURIComponent(str)));
     return b.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -721,10 +802,8 @@
     while(s.length%4) s+='=';
     return decodeURIComponent(escape(atob(s)));
   }
-  function shareLink(){
-    const u = location.href.split('#')[0];
-    return u + '#d=' + b64urlEncode(JSON.stringify(CURRENT));
-  }
+  function baseUrl(){ return location.href.split('#')[0]; }
+  function shareLink(data){ return baseUrl() + '#d=' + b64urlEncode(JSON.stringify(data||CURRENT)); }
   async function copyText(t){
     try{ await navigator.clipboard.writeText(t); return true; }
     catch(e){
@@ -733,15 +812,16 @@
     }
   }
   async function oneClickShare(){
-    saveData();                       // 自动把当前编辑内容写入本地 SQLite WASM
+    if(VIEW.kind==='mine') saveMine();     // 仅“我的版本”才需要先落库；分享视图直接分享当前内容
     const link = shareLink();
     const ok = await copyText(link);
-    if(ok){ toast('🔗 分享链接已复制到剪贴板'); }
+    if(ok){ toast('🔗 分享链接已复制（版本 #'+snapId(CURRENT)+'）'); }
     else { openShareModal(link); }
   }
   function openShareModal(link){
     const ta=document.getElementById('shareUrl'); if(ta) ta.value=link;
     document.getElementById('shareModal').classList.add('show');
+    renderSnapList();
   }
   function closeShare(){ document.getElementById('shareModal').classList.remove('show'); }
   try{ document.getElementById('shareModal').addEventListener('click', closeShare); }catch(e){}
@@ -749,27 +829,61 @@
     const ta=document.getElementById('shareUrl'); if(ta) ta.select();
     copyText(ta.value).then(ok=> toast(ok?'已复制链接':'请手动复制选中内容'));
   }
+  // 分享记录（本地内容寻址快照仓库）——可回看/复制，多个版本互不冲突
+  async function renderSnapList(){
+    const box=document.getElementById('snapList'); if(!box) return;
+    const list=await snapList();
+    if(!list.length){ box.innerHTML='<div class="pmeta">暂无分享记录。点“一键分享”后，对方或你打开过的版本会按内容哈希存档在这里，可随时回看。</div>'; return; }
+    box.innerHTML = list.map(r=>{
+      const t=new Date(r.ts); const tt=`${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+      return `<div class="snap-row">
+        <span class="snap-id">#${r.id}</span>
+        <span class="snap-meta">${countOf(r.data)} 条 · ${tt}</span>
+        <button class="tool" onclick="reopenSnap('${r.id}')">打开</button>
+        <button class="tool" onclick="copySnapLink('${r.id}')">复制链接</button>
+      </div>`;
+    }).join('');
+  }
+  async function reopenSnap(id){
+    const rec=await snapGet(id); if(!rec||!rec.data){ toast('该版本已不存在'); return; }
+    try{ history.replaceState(null,'', baseUrl()+'#d='+b64urlEncode(JSON.stringify(rec.data))); }catch(e){}
+    closeShare();
+    openSnapshot(rec.data, false);
+  }
+  async function copySnapLink(id){
+    const rec=await snapGet(id); if(!rec||!rec.data){ toast('该版本已不存在'); return; }
+    const ok=await copyText(shareLink(rec.data));
+    toast(ok?('已复制 #'+id+' 的链接'):'请手动复制');
+  }
+  // 载入分享链接：只进“分享版本”视图，绝不覆盖“我的版本”，且保留哈希以便刷新
   async function applySharedHash(){
     const m = location.hash.match(/d=([^&]+)/);
     if(!m) return false;
     try{
       const d = JSON.parse(b64urlDecode(m[1]));
-      if(!d.L||!d.R) return false;
-      CURRENT = d; saveData(); render();
-      toast('已载入分享的内容（已保存到本地 SQLite）');
-      history.replaceState(null,'',location.pathname+location.search);
+      if(!d.L||!d.R) throw new Error('bad shape');
+      await openSnapshot(d, true);
       return true;
-    }catch(e){ console.warn('分享链接解析失败', e); return false; }
+    }catch(e){
+      console.warn('分享链接解析失败', e);
+      toast('⚠️ 分享链接已损坏或被聊天软件截断，请让对方重新复制完整链接');
+      return false;
+    }
   }
 
   /* ---------- init ---------- */
   async function boot(){
     // 先初始化 SQLite WASM 持久化（异步；失败自动回退 localStorage）
     await initStorage();
-    // 若链接带分享数据，优先载入（满足“接收分享”）
-    let fromShare=false;
-    try{ fromShare = await applySharedHash(); }catch(e){}
-    if(!fromShare) loadData();
+    // 视图解析：链接带 #d= → 打开“分享版本”（绝不覆盖我的版本，且保留哈希以便刷新）；
+    //            否则 → 打开“我的版本”。
+    if(/#d=/.test(location.hash)){
+      try{ await applySharedHash(); }catch(e){}
+      if(VIEW.kind!=='snap'){ VIEW={kind:'mine',id:null}; loadMine(); }
+    } else {
+      VIEW = { kind:'mine', id:null };
+      loadMine();
+    }
     // 先渲染表格，确保即使语音相关代码异常，内容也始终可见（避免整页空白）
     render();
     if(isUser()){ hideExportBtn(); }
