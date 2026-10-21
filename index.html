@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>不规则动词表 · 点读版</title>
+<style>
+  :root{
+    --bg1:#eef3fb; --bg2:#e6ecf7; --card:#ffffff; --ink:#1f2733; --muted:#6b7686;
+    --base:#2f6fed; --past:#e0922f; --pp:#15a07a; --zh:#3c4654;
+    --line:#e8edf4; --shadow:0 12px 34px rgba(31,39,51,.12);
+    --accent:#2f6fed;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    color:var(--ink); min-height:100vh; padding-bottom:40px;
+  }
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:30;
+    background:rgba(255,255,255,.82); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+    padding:12px 20px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  }
+  .brand{font-weight:700; font-size:16px; margin-right:auto; display:flex; align-items:center; gap:8px;}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--base),var(--pp));}
+  .tool{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:10px; padding:8px 12px; font-size:13px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px; transition:.15s; white-space:nowrap;
+  }
+  .tool:hover{border-color:var(--accent); color:var(--accent); transform:translateY(-1px);}
+  .tool.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .tool.primary:hover{filter:brightness(1.05); color:#fff;}
+  .search{
+    border:1px solid var(--line); background:#fff; border-radius:10px; padding:8px 12px;
+    font-size:13px; min-width:180px; outline:none;
+  }
+  .search:focus{border-color:var(--accent);}
+  /* ---------- document ---------- */
+  .page{max-width:1100px; margin:26px auto; padding:0 18px;}
+  .doc-title{
+    text-align:center; margin:6px 0 22px; font-size:30px; letter-spacing:.5px;
+    font-family:"Georgia","Times New Roman",serif;
+  }
+  .doc-title span{display:block; font-size:15px; color:var(--muted); font-family:inherit; margin-top:4px; letter-spacing:2px;}
+  .tables{display:flex; gap:26px; align-items:flex-start;}
+  .verb-col{
+    flex:1 1 0; background:var(--card); border-radius:16px; box-shadow:var(--shadow);
+    overflow:hidden; border:1px solid var(--line);
+  }
+  table{width:100%; border-collapse:collapse; font-size:15px;}
+  thead th{
+    background:linear-gradient(180deg,#f7f9fd,#eef3fb);
+    color:var(--muted); font-weight:600; font-size:13px; text-align:left;
+    padding:12px 14px; border-bottom:2px solid var(--line); position:sticky; top:0;
+  }
+  thead th .en{display:block; font-size:11px; color:#aab3c2; font-weight:500; letter-spacing:.5px;}
+  tbody td{
+    padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:middle;
+  }
+  tbody tr:nth-child(even){background:#fafcff;}
+  tbody tr:hover{background:#f0f5ff;}
+  tbody tr.hide{display:none;}
+  /* word cells */
+  .wf{position:relative; cursor:pointer; font-weight:600; transition:.12s; border-radius:6px;}
+  .wf .spk{opacity:0; font-size:12px; margin-left:6px; transition:.12s;}
+  .wf:hover{background:#e7f0ff;}
+  .wf:hover .spk{opacity:.7;}
+  .wf.base{color:var(--base);}
+  .wf.past{color:var(--past);}
+  .wf.pp{color:var(--pp);}
+  .zh{cursor:pointer; color:var(--zh);}
+  .zh:hover{background:#fff3e6; border-radius:6px;}
+  .wf.speaking, .zh.speaking{
+    background:#ffe49a !important; color:#7a5b00;
+    box-shadow:inset 0 0 0 2px #f3b73f; border-radius:6px;
+  }
+  .act{width:42px; text-align:center; padding:6px;}
+  .act button{
+    border:none; background:#f1f4fa; color:var(--accent); width:30px; height:30px;
+    border-radius:50%; cursor:pointer; font-size:13px; opacity:0; transition:.15s;
+  }
+  tbody tr:hover .act button{opacity:1;}
+  .act button:hover{background:var(--accent); color:#fff;}
+  .noact thead th:last-child,.noact .act{display:none;}
+  .hint{text-align:center; color:var(--muted); font-size:13px; margin-top:18px;}
+  .tag{display:inline-block; font-size:11px; background:#eef3fb; color:var(--muted); border-radius:6px; padding:2px 7px; margin:0 3px;}
+  /* ---------- panels ---------- */
+  .panel{
+    position:fixed; right:18px; top:70px; width:360px; max-width:calc(100vw - 36px);
+    background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+    padding:18px; z-index:50; display:none; max-height:84vh; overflow:auto;
+  }
+  .panel.show{display:block; animation:pop .18s ease;}
+  @keyframes pop{from{opacity:0; transform:translateY(-6px);}to{opacity:1; transform:none;}}
+  .panel h3{margin:0 0 12px; font-size:16px; display:flex; align-items:center; justify-content:space-between;}
+  .panel .x{cursor:pointer; color:var(--muted); border:none; background:none; font-size:18px;}
+  .field{margin-bottom:10px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
+  .field input, .field select, .field textarea{
+    width:100%; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:13px;
+    outline:none; font-family:inherit;
+  }
+  .field textarea{resize:vertical; min-height:90px;}
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--accent);}
+  /* 无内置语音（在线发音兜底）时，隐藏用不上的发音人/语速选项 */
+  body.no-ws #voicePanel .field{display:none;}
+  .row2{display:flex; gap:8px;}
+  .row2 .field{flex:1;}
+  .btn{
+    width:100%; border:none; border-radius:10px; padding:10px; font-size:14px; cursor:pointer;
+    background:var(--accent); color:#fff; margin-top:4px; transition:.15s;
+  }
+  .btn:hover{filter:brightness(1.05);}
+  .btn.ghost{background:#f1f4fa; color:var(--ink);}
+  .btn.ghost:hover{background:#e7ecf5;}
+  .btn.danger{background:#fff0f0; color:#d24b4b;}
+  .btn.danger:hover{background:#ffe2e2;}
+  .pmeta{font-size:12px; color:var(--muted); margin:8px 0; line-height:1.6;}
+  .toast{
+    position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
+    background:#1f2733; color:#fff; padding:10px 18px; border-radius:24px; font-size:13px;
+    z-index:99; opacity:0; transition:.25s; pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+  /* ---------- 导出鉴权弹窗 ---------- */
+  .modal{position:fixed; inset:0; background:rgba(20,28,40,.45); display:none; align-items:center; justify-content:center; z-index:80;}
+  .modal.show{display:flex; animation:pop .18s ease;}
+  .modal-card{background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:20px; width:340px; max-width:calc(100vw - 32px);}
+  .modal-card h3{margin:0 0 8px; font-size:16px; display:flex; align-items:center; justify-content:space-between;}
+  .auth-err{color:#d24b4b; font-size:12px; min-height:16px; margin:2px 0 8px;}
+  @media(max-width:860px){
+    .tables{flex-direction:column;}
+    /* 纵向排列时，flex-basis:0 会让栏目高度塌成 0 → 表格不可见；改回按内容自适应 */
+    .verb-col{flex:0 0 auto; width:100%;}
+    .panel{right:8px; left:8px; width:auto;}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>不规则动词表 · 点读版</div>
+    <input id="search" class="search" placeholder="🔍 搜索单词 / 释义…" oninput="doSearch(this.value)">
+    <button class="tool" onclick="readAll()">🔊 朗读全部</button>
+    <button class="tool" onclick="stopSpeak()">⏹ 停止</button>
+    <button class="tool" id="actToggle" onclick="toggleActionCol()">▶ 朗读栏</button>
+    <button class="tool" onclick="togglePanel('voicePanel')">🎚 语音</button>
+    <button class="tool" onclick="togglePanel('editPanel')">✚ 新增单词</button>
+    <button class="tool" id="exportBtn" onclick="requestExport()">📤 导出网页</button>
+    <button class="tool" id="shareBtn" onclick="oneClickShare()">🔗 一键分享</button>
+  </div>
+
+  <div class="page">
+    <h1 class="doc-title">Irregular Verbs<span>不 规 则 动 词 表</span></h1>
+    <div class="tables" id="tables"></div>
+    <div class="hint">
+      点击任意 <span class="tag" style="color:var(--base)">原形</span>
+      <span class="tag" style="color:var(--past)">过去式</span>
+      <span class="tag" style="color:var(--pp)">过去分词</span> 即可发音；
+      点击释义可听中文。悬停行右侧 ▶ 可朗读整行。
+    </div>
+  </div>
+
+  <!-- 新增/编辑面板 -->
+  <div class="panel" id="editPanel">
+    <h3>新增单词 <button class="x" onclick="togglePanel('editPanel')">×</button></h3>
+    <div class="field row2">
+      <div class="field"><label>原形 (base)</label><input id="n_base" placeholder="go"></div>
+      <div class="field"><label>过去式</label><input id="n_past" placeholder="went"></div>
+    </div>
+    <div class="field row2">
+      <div class="field"><label>过去分词</label><input id="n_pp" placeholder="gone"></div>
+      <div class="field"><label>释义</label><input id="n_zh" placeholder="去"></div>
+    </div>
+    <div class="field">
+      <label>放入栏位</label>
+      <select id="n_side"><option value="auto">自动（放进较短的一栏）</option><option value="L">左栏</option><option value="R">右栏</option></select>
+    </div>
+    <button class="btn" onclick="addSingle()">＋ 添加这一条</button>
+
+    <div style="border-top:1px dashed var(--line); margin:14px 0;"></div>
+
+    <div class="field">
+      <label>批量粘贴（每行一条：原形 过去式 过去分词 释义）</label>
+      <textarea id="n_batch" placeholder="go went gone 去&#10;fly flew flown 飞"></textarea>
+    </div>
+    <button class="btn ghost" onclick="addBatch()">＋ 批量添加</button>
+
+    <div class="pmeta" id="editMeta"></div>
+    <button class="btn ghost" onclick="importJson()">📥 导入数据(JSON)</button>
+    <button class="btn ghost danger" onclick="resetData()">↺ 重置为原始表格</button>
+  </div>
+
+  <!-- 语音设置面板 -->
+  <div class="panel" id="voicePanel">
+    <h3>语音设置 <button class="x" onclick="togglePanel('voicePanel')">×</button></h3>
+    <div class="field">
+      <label>英文发音人</label>
+      <select id="voiceEn"></select>
+    </div>
+    <div class="field">
+      <label>中文发音人</label>
+      <select id="voiceZh"></select>
+    </div>
+    <div class="field">
+      <label>语速（慢一点更易跟读）</label>
+      <input id="rate" type="range" min="0.5" max="1.2" step="0.05" value="0.9">
+      <span id="rateVal" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="pmeta">发音优先使用浏览器内置语音（无需联网）；若浏览器不支持内置语音（常见于微信/QQ 内置浏览器），将自动改用在线发音，此时需联网。</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 导出鉴权弹窗 -->
+  <div class="modal" id="authModal">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3>导出鉴权 <button class="x" onclick="closeAuth()">×</button></h3>
+      <p class="pmeta">导出网页前需输入公钥与私钥，两者均正确方可导出。连续错误 3 次将禁用导出功能。</p>
+      <div class="field"><label>公钥 (Public Key)</label><input id="authPub" type="text" inputmode="numeric" placeholder="请输入公钥" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+      <div class="field"><label>私钥 (Private Key)</label><input id="authPri" type="password" placeholder="请输入私钥" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+      <div id="authErr" class="auth-err"></div>
+      <button class="btn" onclick="submitAuth()">确认导出</button>
+    </div>
+  </div>
+
+  <!-- 一键分享弹窗（复制链接失败时的回退） -->
+  <div class="modal" id="shareModal">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3>分享链接 <button class="x" onclick="closeShare()">×</button></h3>
+      <p class="pmeta">已把当前内容写入本地 SQLite。复制下面的链接发给同学，对方打开即可看到你这份动词表（无需服务器）。</p>
+      <div class="field"><label>分享链接（已自动选中，Ctrl/⌘+C 复制）</label>
+        <textarea id="shareUrl" rows="3" readonly onclick="this.select()"></textarea>
+      </div>
+      <button class="btn" onclick="copyShareUrl()">复制链接</button>
+    </div>
+  </div>
+
+<!-- SQLite WASM (sql.js)：本地持久化编辑内容；加载失败自动回退 localStorage -->
+<script src="vendor/sqljs/sql-wasm.js"></script>
+
+<script>
+  let FORCE_DEFAULT = false;
+  const DEFAULT_DATA = {"L": [["is", "was", "been", "是"], ["am", "was", "been", "是"], ["are", "were", "been", "是"], ["do", "did", "done", "做"], ["eat", "ate", "eaten", "吃"], ["go", "went", "gone", "去"], ["have", "had", "had", "有，吃"], ["see", "saw", "seen", "看见"], ["say", "said", "said", "说"], ["take", "took", "taken", "带"], ["tell", "told", "told", "告诉"], ["sell", "sold", "sold", "卖"], ["make", "made", "made", "做"], ["get", "got", "gotten", "得到"], ["forget", "forgot", "forgotten", "忘记"], ["know", "knew", "known", "知道"], ["find", "found", "found", "发现"], ["win", "won", "won", "赢"], ["lose", "lost", "lost", "丢失"], ["pay", "paid", "paid", "付钱"], ["hear", "heard", "heard", "听见"], ["stand", "stood", "stood", "站"], ["speak", "spoke", "spoken", "说"], ["cut", "cut", "cut", "砍，割"], ["let", "let", "let", "让"], ["put", "put", "put", "放"], ["read", "read", "read", "读"], ["beat", "beat", "beaten", "打败"], ["swim", "swam", "swum", "游泳"], ["sit", "sat", "sat", "坐"], ["babysit", "babysat", "babysat", "照顾"], ["sing", "sang", "sung", "唱"], ["drink", "drank", "drunk", "喝"], ["begin", "began", "begun", "开始"], ["run", "ran", "run", "跑"]], "R": [["keep", "kept", "kept", "保持"], ["sleep", "slept", "slept", "睡"], ["sweep", "swept", "swept", "打扫"], ["spell", "spelt", "spelt", "拼写"], ["feel", "felt", "felt", "感觉"], ["feed", "fed", "fed", "喂养"], ["leave", "left", "left", "离开"], ["meet", "met", "met", "遇见"], ["mean", "meant", "meant", "意味"], ["hold", "held", "held", "握住"], ["ride", "rode", "ridden", "骑"], ["write", "wrote", "written", "写"], ["come", "came", "come", "来"], ["become", "became", "become", "变得"], ["give", "gave", "given", "给"], ["send", "sent", "sent", "发送"], ["spend", "spent", "spent", "花费"], ["build", "built", "built", "建筑"], ["think", "thought", "thought", "想"], ["buy", "bought", "bought", "买"], ["bring", "brought", "brought", "带来"], ["fight", "fought", "fought", "打仗"], ["teach", "taught", "taught", "教"], ["learn", "learnt", "learnt", "学习"], ["grow", "grew", "grown", "生长"], ["draw", "drew", "drawn", "画"], ["wear", "wore", "worn", "穿"], ["bear", "bore", "born", "生"], ["hang", "hung", "hung", "挂"], ["lie", "lay", "lain", "躺"], ["lay", "laid", "laid", "产（卵）"], ["freeze", "froze", "frozen", "冰冻"], ["can", "could", "----", "能"], ["shall", "should", "----", "将"], ["will", "would", "----", "将"]]};
+
+  const KEY = 'nce1_irregular_v1';
+  // SQLite WASM 资源位置：根文件用 CDN；部署到 GitHub Pages 的副本用本地 vendor/sqljs/
+  const SQL_LOCATE = f => 'vendor/sqljs/' + f;
+  let CURRENT, voices = [], rate = 0.9, showAction = true, currentEl = null, speakToken = 0;
+  let DB = null, SQL = null, storageMode = 'memory';   // 'sqlite' | 'local' | 'memory'
+
+  function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+  /* ---------- 持久化：SQLite WASM (sql.js) + IndexedDB；失败回退 localStorage ---------- */
+  function idbGet(k){ return new Promise((res)=>{ try{
+    const r = indexedDB.open('nce1_db');
+    r.onupgradeneeded = ()=> r.result.createObjectStore('kv');
+    r.onsuccess = ()=>{ const db=r.result; try{
+      const tx=db.transaction('kv','readonly'); const rq=tx.objectStore('kv').get(k);
+      rq.onsuccess=()=>res(rq.result? rq.result.bytes : null); rq.onerror=()=>res(null);
+    }catch(e){ res(null); } };
+    r.onerror = ()=> res(null);
+  }catch(e){ res(null); } }); }
+  function idbSet(k, bytes){ return new Promise((res)=>{ try{
+    const r = indexedDB.open('nce1_db');
+    r.onupgradeneeded = ()=> r.result.createObjectStore('kv');
+    r.onsuccess = ()=>{ const db=r.result; try{
+      const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put({bytes}, k);
+      tx.oncomplete=()=>res(true); tx.onerror=()=>res(false);
+    }catch(e){ res(false); } };
+    r.onerror = ()=> res(false);
+  }catch(e){ res(false); } }); }
+
+  async function initStorage(){
+    try{
+      if(typeof initSqlJs !== 'function') throw new Error('sql.js 未加载（离线？）');
+      SQL = await initSqlJs({ locateFile: SQL_LOCATE });
+      const bytes = await idbGet('verbs_db');
+      DB = new SQL.Database(bytes ? new Uint8Array(bytes) : undefined);
+      DB.run("CREATE TABLE IF NOT EXISTS verbs(side TEXT, ord INTEGER, base TEXT, past TEXT, pp TEXT, zh TEXT);");
+      storageMode = 'sqlite';
+    }catch(e){
+      console.warn('SQLite 初始化失败，回退到 localStorage：', e);
+      storageMode = ('indexedDB' in window) ? 'local' : 'memory';
+    }
+  }
+  function loadFromDB(){
+    try{
+      const r = DB.exec("SELECT side,ord,base,past,pp,zh FROM verbs ORDER BY side,ord");
+      if(!r.length) return null;
+      const data={L:[],R:[]};
+      r[0].values.forEach(v=>{ (data[v[0]]||(data[v[0]]=[])).push([v[2],v[3],v[4],v[5]||'']); });
+      return data;
+    }catch(e){ return null; }
+  }
+  function saveToDB(data){
+    try{
+      DB.run("DELETE FROM verbs;");
+      const st = DB.prepare("INSERT INTO verbs(side,ord,base,past,pp,zh) VALUES(?,?,?,?,?,?);");
+      ['L','R'].forEach(side=> data[side].forEach((a,ord)=> st.run([side,ord,a[0],a[1],a[2],a[3]||''])));
+      st.free();
+      idbSet('verbs_db', DB.export());
+    }catch(e){ console.warn('saveToDB 失败：', e); }
+  }
+  function loadData(){
+    if(FORCE_DEFAULT){ CURRENT = clone(DEFAULT_DATA); return; }
+    if(storageMode==='sqlite' && DB){
+      const d = loadFromDB();
+      if(d){ CURRENT = d; return; }
+    }
+    try{ const s = localStorage.getItem(KEY); if(s){ CURRENT = JSON.parse(s); return; } }catch(e){}
+    CURRENT = clone(DEFAULT_DATA);
+  }
+  function saveData(){
+    if(storageMode==='sqlite' && DB){ saveToDB(CURRENT); }
+    try{ localStorage.setItem(KEY, JSON.stringify(CURRENT)); }catch(e){}
+  }
+
+  const SKIP = '----';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  function render(){
+    const wrap = document.getElementById('tables');
+    wrap.innerHTML = '';
+    ['L','R'].forEach(side=>{
+      const col = document.createElement('div'); col.className='verb-col'+(showAction?'':' noact');
+      let rows = '';
+      CURRENT[side].forEach(a=>{
+        const b=a[0], p=a[1], pp=a[2], zh=a[3]||'';
+        const cell=(cls,val)=>`<td class="wf ${cls}" onclick="speakWord(this,'en')" data-w="${esc(val)}">${esc(val)}<span class="spk">🔊</span></td>`;
+        rows += `<tr>
+          ${cell('base',b)}
+          ${cell('past',p)}
+          ${cell('pp',pp)}
+          <td class="zh" onclick="speakWord(this,'zh')" data-w="${esc(zh)}">${esc(zh)||'<span style="color:#c2cad6">—</span>'}</td>
+          <td class="act"><button title="朗读整行" onclick="readRow(this)">▶</button></td>
+        </tr>`;
+      });
+      col.innerHTML = `<table>
+        <thead><tr>
+          <th>原形<span class="en">BASE</span></th>
+          <th>过去式<span class="en">PAST</span></th>
+          <th>过去分词<span class="en">PAST PARTICIPLE</span></th>
+          <th>释义<span class="en">MEANING</span></th>
+          <th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+      wrap.appendChild(col);
+    });
+    updateMeta();
+  }
+
+  function updateMeta(){
+    const total = CURRENT.L.length + CURRENT.R.length;
+    const add = total - (DEFAULT_DATA.L.length + DEFAULT_DATA.R.length);
+    document.getElementById('editMeta').innerHTML =
+      `当前共 <b>${total}</b> 条` + (add>0?`　（本次新增 <b style="color:var(--accent)">${add}</b> 条）`:'') +
+      `<br>左栏 ${CURRENT.L.length} 条 · 右栏 ${CURRENT.R.length} 条`;
+  }
+
+  /* ---------- speech ---------- */
+  function loadVoices(){
+    voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    const en = document.getElementById('voiceEn'), zh = document.getElementById('voiceZh');
+    en.innerHTML=''; zh.innerHTML='';
+    voices.forEach((v,i)=>{
+      const o=document.createElement('option'); o.value=i; o.textContent=`${v.name} (${v.lang})`;
+      if(v.lang && v.lang.toLowerCase().startsWith('en')) en.appendChild(o);
+      if(v.lang && v.lang.toLowerCase().startsWith('zh')) zh.appendChild(o);
+    });
+    if(!en.options.length) en.innerHTML='<option value="">（无英文语音包）</option>';
+    if(!zh.options.length) zh.innerHTML='<option value="">（无中文语音包）</option>';
+  }
+  function pickVoice(selId){
+    const sel = document.getElementById(selId);
+    if(sel && sel.value!=='') return voices[+sel.value] || null;
+    return null;
+  }
+  /* highlight the word currently being spoken */
+  function highlight(el){
+    if(currentEl && currentEl!==el) currentEl.classList.remove('speaking');
+    currentEl = el;
+    if(el){
+      el.classList.add('speaking');
+      el.scrollIntoView({block:'nearest'});
+    }
+  }
+  function clearHighlight(){
+    if(currentEl){ currentEl.classList.remove('speaking'); currentEl = null; }
+  }
+  function makeUtterance(text, lang){
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    const v = pickVoice(lang==='zh'?'voiceZh':'voiceEn');
+    if(v) u.voice = v;
+    u.rate = rate; u.pitch = 1;
+    return u;
+  }
+  /* ---------- 在线发音兜底（浏览器无内置语音时用，需联网） ---------- */
+  const WS_SUPPORT = ('speechSynthesis' in window) && ('SpeechSynthesisUtterance' in window);
+  let audioEl = null;
+  function getAudio(){
+    if(!audioEl){ audioEl = new Audio(); audioEl.preload = 'auto'; }
+    return audioEl;
+  }
+  function ttsUrl(text, lang){
+    // 有道词典在线发音：国内可直接访问、无需密钥。英文 type=2(美式)，中文 type=1
+    const type = (lang==='zh') ? 1 : 2;
+    return 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=' + type;
+  }
+  function audioPlay(it, myToken, done){
+    if(myToken!==speakToken) return;
+    const a = getAudio();
+    a.onplay = a.onended = a.onerror = null;
+    a.src = ttsUrl(it.text, it.lang);
+    a.onplay  = ()=>{ if(myToken===speakToken) highlight(it.el); };
+    a.onended = ()=>{ if(myToken!==speakToken) return; if(currentEl===it.el) clearHighlight(); done(); };
+    a.onerror = ()=>{ if(myToken!==speakToken) return; if(currentEl===it.el) clearHighlight(); done(); };
+    const p = a.play();
+    if(p && p.catch) p.catch(()=>{ if(myToken!==speakToken) return; done(); });
+  }
+  /* 播放单个词条：优先内置语音，失败/超时/不支持则自动转在线发音 */
+  function playOne(it, myToken, done){
+    if(myToken!==speakToken) return;
+    if(WS_SUPPORT){
+      let started = false, wsFailed = false, timer = null;
+      const u = makeUtterance(it.text, it.lang);
+      u.onstart = ()=>{ started = true; clearTimeout(timer); highlight(it.el); };
+      u.onerror = ()=>{
+        if(myToken!==speakToken) return;
+        wsFailed = true; clearTimeout(timer);
+        try{ speechSynthesis.cancel(); }catch(e){}
+        audioPlay(it, myToken, ()=>{ if(currentEl===it.el) clearHighlight(); done(); });
+      };
+      u.onend = ()=>{
+        if(wsFailed || myToken!==speakToken) return;
+        if(currentEl===it.el) clearHighlight();
+        done();
+      };
+      // 安全网：内置语音存在却迟迟不发声（无声/无语音包），1.5s 后转在线发音
+      timer = setTimeout(()=>{
+        if(started || myToken!==speakToken) return;
+        wsFailed = true;
+        try{ speechSynthesis.cancel(); }catch(e){}
+        audioPlay(it, myToken, ()=>{ if(currentEl===it.el) clearHighlight(); done(); });
+      }, 1500);
+      speechSynthesis.speak(u);
+    } else {
+      audioPlay(it, myToken, done);
+    }
+  }
+  function speak(text, lang, el){
+    text = (text||'').trim();
+    if(!text || text===SKIP) return;
+    speakToken++;
+    if(WS_SUPPORT){ try{ speechSynthesis.cancel(); }catch(e){} }
+    else { const a=getAudio(); try{ a.pause(); }catch(e){} }
+    playOne({text, lang, el}, speakToken, ()=>{});
+  }
+  function speakWord(el, lang){
+    const w = el.getAttribute('data-w');
+    if(w===SKIP){ return; }
+    speak(w, lang, el);
+  }
+  /* queue a list of {text,lang,el} and play them one by one, highlighting each */
+  function playSequence(items){
+    if(!items.length) return;
+    if(WS_SUPPORT){ try{ speechSynthesis.cancel(); }catch(e){} }
+    else { const a=getAudio(); try{ a.pause(); }catch(e){} }
+    const myToken = ++speakToken;
+    let i = 0;
+    (function next(){
+      if(myToken!==speakToken) return;  // aborted by a newer action
+      if(i>=items.length){ clearHighlight(); return; }
+      const it = items[i++];
+      playOne(it, myToken, next);
+    })();
+  }
+  function readRow(btn){
+    const tr = btn.closest('tr');
+    const items = [...tr.querySelectorAll('.wf')]
+      .map(c=>({text:c.getAttribute('data-w'), lang:'en', el:c}))
+      .filter(it=> it.text && it.text!==SKIP);
+    playSequence(items);
+  }
+  function readAll(){
+    const items = [...document.querySelectorAll('.wf')]
+      .filter(c=>{ const w=c.getAttribute('data-w'); return w && w!==SKIP; })
+      .map(c=>({text:c.getAttribute('data-w'), lang:'en', el:c}));
+    playSequence(items);
+    toast(`开始朗读全部：${items.length} 个单词`);
+  }
+  function stopSpeak(){
+    speakToken++;
+    if(WS_SUPPORT){ try{ speechSynthesis.cancel(); }catch(e){} }
+    const a=getAudio(); try{ a.pause(); a.currentTime=0; }catch(e){}
+    clearHighlight();
+  }
+
+  /* ---------- search ---------- */
+  function doSearch(q){
+    q=(q||'').trim().toLowerCase();
+    document.querySelectorAll('#tables tbody tr').forEach(tr=>{
+      const t = tr.textContent.toLowerCase();
+      tr.classList.toggle('hide', q!=='' && !t.includes(q));
+    });
+  }
+
+  /* ---------- panels ---------- */
+  function togglePanel(id){
+    document.querySelectorAll('.panel').forEach(p=>{ if(p.id!==id) p.classList.remove('show'); });
+    document.getElementById(id).classList.toggle('show');
+  }
+  function toggleActionCol(){
+    showAction=!showAction;
+    document.querySelectorAll('.verb-col').forEach(c=>c.classList.toggle('noact',!showAction));
+    document.getElementById('actToggle').style.background = showAction?'var(--accent)':'#fff';
+    document.getElementById('actToggle').style.color = showAction?'#fff':'var(--ink)';
+  }
+
+  /* ---------- add words ---------- */
+  function addSingle(){
+    const b=document.getElementById('n_base').value.trim();
+    if(!b){ toast('请填写原形'); return; }
+    const p=document.getElementById('n_past').value.trim()||b;
+    const pp=document.getElementById('n_pp').value.trim()||b;
+    const zh=document.getElementById('n_zh').value.trim();
+    const side=document.getElementById('n_side').value;
+    const target = side==='auto' ? (CURRENT.L.length<=CURRENT.R.length?'L':'R') : side;
+    CURRENT[target].push([b,p,pp,zh]);
+    saveData(); render();
+    ['n_base','n_past','n_pp','n_zh'].forEach(id=>document.getElementById(id).value='');
+    toast(`已添加「${b}」到${target==='L'?'左':'右'}栏`);
+  }
+  function addBatch(){
+    const txt=document.getElementById('n_batch').value.trim();
+    if(!txt){ toast('请粘贴内容'); return; }
+    let n=0;
+    txt.split(/\n+/).forEach(line=>{
+      const parts=line.trim().split(/\s+/);
+      if(parts.length<3) return;
+      const b=parts[0], p=parts[1], pp=parts[2], zh=parts.slice(3).join(' ');
+      const target = CURRENT.L.length<=CURRENT.R.length?'L':'R';
+      CURRENT[target].push([b,p,pp,zh]); n++;
+    });
+    if(n===0){ toast('未解析到有效数据'); return; }
+    saveData(); render();
+    document.getElementById('n_batch').value='';
+    toast(`批量添加 ${n} 条`);
+  }
+  function resetData(){
+    if(!confirm('确定要清空所有新增单词，恢复到原始表格吗？')) return;
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    CURRENT = clone(DEFAULT_DATA); saveData(); render();
+    toast('已恢复原始表格');
+  }
+  function importJson(){
+    const inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+    inp.onchange=()=>{
+      const f=inp.files[0]; if(!f) return;
+      const r=new FileReader();
+      r.onload=()=>{
+        try{
+          const d=JSON.parse(r.result);
+          if(!d.L||!d.R) throw 0;
+          CURRENT=d; saveData(); render(); toast('导入成功');
+        }catch(e){ toast('JSON 格式不正确'); }
+      };
+      r.readAsText(f);
+    };
+    inp.click();
+  }
+
+  /* ---------- export standalone html ---------- */
+  /* ---------- 导出鉴权（公钥 + 私钥，SHA-256 哈希比对） ---------- */
+  /* 同步 SHA-256（不依赖 crypto.subtle，file:// 离线双击也可用） */
+  function sha256(ascii){
+    function rightRotate(value, amount){ return (value>>>amount) | (value<<(32-amount)); }
+    var mathPow=Math.pow, maxWord=mathPow(2,32), lengthProperty='length', i, j, result='', words=[];
+    var asciiBitLength=ascii[lengthProperty]*8;
+    var hash=sha256.h=sha256.h||[], k=sha256.k=sha256.k||[];
+    var primeCounter=k[lengthProperty], isComposite={};
+    for(var candidate=2; primeCounter<64; candidate++){
+      if(!isComposite[candidate]){
+        for(i=0;i<313;i+=candidate) isComposite[i]=candidate;
+        hash[primeCounter]=(mathPow(candidate,.5)*maxWord)|0;
+        k[primeCounter++]=(mathPow(candidate,1/3)*maxWord)|0;
+      }
+    }
+    ascii=unescape(encodeURIComponent(ascii)) + '\x80';
+    while(ascii[lengthProperty]%64-56) ascii+='\x00';
+    for(i=0;i<ascii[lengthProperty]; i++){
+      j=ascii.charCodeAt(i);
+      if(j>>8) return;
+      words[i>>2]|=j<<((3-i)%4)*8;
+    }
+    words[words[lengthProperty]]=((asciiBitLength/maxWord)|0);
+    words[words[lengthProperty]]=asciiBitLength;
+    for(j=0;j<words[lengthProperty];){
+      var w=words.slice(j,j+=16), oldHash=hash;
+      hash=hash.slice(0,8);
+      for(i=0;i<64;i++){
+        var w15=w[i-15], w2=w[i-2], a=hash[0], e=hash[4];
+        var temp1=hash[7]+(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))+((e&hash[5])^((~e)&hash[6]))+k[i]+(w[i]=(i<16)?w[i]:(w[i-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[i-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
+        var temp2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+        hash=[(temp1+temp2)|0].concat(hash);
+        hash[4]=(hash[4]+temp1)|0;
+      }
+      for(i=0;i<8;i++) hash[i]=(hash[i]+oldHash[i])|0;
+    }
+    for(i=0;i<8;i++) for(j=3;j+1;j--){ var b=(hash[i]>>(j*8))&255; result+=((b<16)?0:'')+b.toString(16); }
+    return result;
+  }
+
+  // 预存的“正确”公钥/私钥 SHA-256 哈希（明文 0813；仅存哈希，源码不暴露明文）
+  const PUB_HASH = 'b7d7525bb8de465f1d0bb4c053a1efda4d423dbef59fe6ac7ca0cb44da7e9127';
+  const PRI_HASH = 'b7d7525bb8de465f1d0bb4c053a1efda4d423dbef59fe6ac7ca0cb44da7e9127';
+  const ROLE_KEY = 'nce1_role';        // 'user' = 被禁用普通用户；'author' = 已验证作者
+  const CRED_KEY = 'nce1_author_cred'; // 作者凭据：{pub,pri} 的 SHA-256 哈希（不存明文）
+  const FAIL_KEY = 'nce1_export_fail'; // 连续错误次数
+
+  function getRole(){ try{ return localStorage.getItem(ROLE_KEY); }catch(e){ return null; } }
+  function isUser(){ return getRole()==='user'; }
+  function hideExportBtn(){ const b=document.getElementById('exportBtn'); if(b) b.style.display='none'; }
+  function getFail(){ try{ return parseInt(localStorage.getItem(FAIL_KEY)||'0',10)||0; }catch(e){ return 0; } }
+  function setFail(n){ try{ localStorage.setItem(FAIL_KEY, String(n)); }catch(e){} }
+
+  // 校验一组明文公钥/私钥是否正确（SHA-256 比对）
+  function verifyKey(pub, pri){
+    return sha256(String(pub))===PUB_HASH && sha256(String(pri))===PRI_HASH;
+  }
+  // 本地是否已保存“有效”的作者凭据
+  function localAuthorValid(){
+    try{
+      const raw=localStorage.getItem(CRED_KEY);
+      if(!raw) return false;
+      const c=JSON.parse(raw);
+      return c && c.pub===PUB_HASH && c.pri===PRI_HASH;
+    }catch(e){ return false; }
+  }
+
+  function requestExport(){
+    if(isUser()){ toast('导出功能已被禁用'); return; }
+    // 已验证作者：本地凭据有效 → 免输直接导出
+    if(localAuthorValid()){ exportHtml(); return; }
+    // 本地存有凭据但无效（被篡改）→ 判定为普通用户并禁用导出
+    try{
+      if(localStorage.getItem(CRED_KEY)){
+        localStorage.setItem(ROLE_KEY,'user'); hideExportBtn();
+        toast('检测到无效凭据，导出功能已禁用'); return;
+      }
+    }catch(e){}
+    openAuth();
+  }
+  function openAuth(){
+    document.getElementById('authPub').value='';
+    document.getElementById('authPri').value='';
+    document.getElementById('authErr').textContent='';
+    document.getElementById('authModal').classList.add('show');
+    setTimeout(()=>{ try{ document.getElementById('authPub').focus(); }catch(e){} }, 50);
+  }
+  function closeAuth(){ document.getElementById('authModal').classList.remove('show'); }
+  try{ document.getElementById('authModal').addEventListener('click', closeAuth); }catch(e){}
+  function submitAuth(){
+    const pub=document.getElementById('authPub').value;
+    const pri=document.getElementById('authPri').value;
+    if(verifyKey(pub, pri)){
+      setFail(0);
+      // 记录为作者：在本地储存公钥/私钥的 SHA-256 哈希（不存明文）
+      try{
+        localStorage.setItem(CRED_KEY, JSON.stringify({pub:PUB_HASH, pri:PRI_HASH}));
+        localStorage.setItem(ROLE_KEY, 'author');
+      }catch(e){}
+      closeAuth();
+      exportHtml();
+    } else {
+      const n=getFail()+1; setFail(n);
+      if(n>=3){
+        try{ localStorage.setItem(ROLE_KEY,'user'); }catch(e){}
+        closeAuth();
+        hideExportBtn();
+        toast('连续错误 3 次，导出功能已禁用');
+      } else {
+        document.getElementById('authErr').textContent='公钥或私钥错误，还剩 '+(3-n)+' 次机会';
+      }
+    }
+  }
+
+  function exportHtml(){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+    let html = document.documentElement.outerHTML;
+    html = html.replace('let FORCE_DEFAULT = false;', 'let FORCE_DEFAULT = true;');
+    html = html.replace(/const DEFAULT_DATA = [\s\S]*?;\n/, 'const DEFAULT_DATA = '+JSON.stringify(CURRENT)+';\n');
+    const blob=new Blob([html],{type:'text/html'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='不规则动词表-点读版.html';
+    a.click();
+    toast('已导出独立网页（含当前全部单词）');
+  }
+
+  /* ---------- toast ---------- */
+  let toastTimer;
+  function toast(msg){
+    const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+  }
+
+  /* ---------- 一键分享（纯静态：把当前数据编码进链接，接收方打开即载入本地 SQLite） ---------- */
+  function b64urlEncode(str){
+    const b = btoa(unescape(encodeURIComponent(str)));
+    return b.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function b64urlDecode(s){
+    s = s.replace(/-/g,'+').replace(/_/g,'/');
+    while(s.length%4) s+='=';
+    return decodeURIComponent(escape(atob(s)));
+  }
+  function shareLink(){
+    const u = location.href.split('#')[0];
+    return u + '#d=' + b64urlEncode(JSON.stringify(CURRENT));
+  }
+  async function copyText(t){
+    try{ await navigator.clipboard.writeText(t); return true; }
+    catch(e){
+      const ta=document.getElementById('shareUrl'); if(ta){ ta.value=t; ta.select(); try{ document.execCommand('copy'); return true; }catch(_){} }
+      return false;
+    }
+  }
+  async function oneClickShare(){
+    saveData();                       // 自动把当前编辑内容写入本地 SQLite WASM
+    const link = shareLink();
+    const ok = await copyText(link);
+    if(ok){ toast('🔗 分享链接已复制到剪贴板'); }
+    else { openShareModal(link); }
+  }
+  function openShareModal(link){
+    const ta=document.getElementById('shareUrl'); if(ta) ta.value=link;
+    document.getElementById('shareModal').classList.add('show');
+  }
+  function closeShare(){ document.getElementById('shareModal').classList.remove('show'); }
+  try{ document.getElementById('shareModal').addEventListener('click', closeShare); }catch(e){}
+  function copyShareUrl(){
+    const ta=document.getElementById('shareUrl'); if(ta) ta.select();
+    copyText(ta.value).then(ok=> toast(ok?'已复制链接':'请手动复制选中内容'));
+  }
+  async function applySharedHash(){
+    const m = location.hash.match(/d=([^&]+)/);
+    if(!m) return false;
+    try{
+      const d = JSON.parse(b64urlDecode(m[1]));
+      if(!d.L||!d.R) return false;
+      CURRENT = d; saveData(); render();
+      toast('已载入分享的内容（已保存到本地 SQLite）');
+      history.replaceState(null,'',location.pathname+location.search);
+      return true;
+    }catch(e){ console.warn('分享链接解析失败', e); return false; }
+  }
+
+  /* ---------- init ---------- */
+  async function boot(){
+    // 先初始化 SQLite WASM 持久化（异步；失败自动回退 localStorage）
+    await initStorage();
+    // 若链接带分享数据，优先载入（满足“接收分享”）
+    let fromShare=false;
+    try{ fromShare = await applySharedHash(); }catch(e){}
+    if(!fromShare) loadData();
+    // 先渲染表格，确保即使语音相关代码异常，内容也始终可见（避免整页空白）
+    render();
+    if(isUser()){ hideExportBtn(); }
+    try{
+      const r=document.getElementById('rate');
+      if(r){
+        r.addEventListener('input',()=>{ rate=+r.value; document.getElementById('rateVal').textContent=rate.toFixed(2)+'×'; });
+        document.getElementById('rateVal').textContent=rate.toFixed(2)+'×';
+      }
+      if('speechSynthesis' in window){
+        loadVoices();
+        speechSynthesis.onvoiceschanged = loadVoices;
+      } else {
+        document.body.classList.add('no-ws');   // 无内置语音 → 走在线发音兜底
+        toast('本机浏览器内置语音不可用，已自动切换为在线发音（需联网）');
+      }
+    }catch(e){
+      console.error('语音初始化异常（不影响表格显示）:', e);
+    }
+  }
+  boot();
+  // 兜底：若 1 秒后表格仍为空（极端异常），强制重渲染，避免白屏
+  setTimeout(()=>{
+    const t=document.getElementById('tables');
+    if(t && t.children.length===0){ try{ render(); }catch(e){} }
+  }, 1000);
+</script>
+</body>
+</html>
