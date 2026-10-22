@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>不规则动词表 · 点读版</title>
 <style>
   :root{
@@ -121,12 +121,6 @@
   .btn.danger{background:#fff0f0; color:#d24b4b;}
   .btn.danger:hover{background:#ffe2e2;}
   .pmeta{font-size:12px; color:var(--muted); margin:8px 0; line-height:1.6;}
-  .toast{
-    position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
-    background:#1f2733; color:#fff; padding:10px 18px; border-radius:24px; font-size:13px;
-    z-index:99; opacity:0; transition:.25s; pointer-events:none;
-  }
-  .toast.show{opacity:1;}
   /* ---------- 导出鉴权弹窗 ---------- */
   .modal{position:fixed; inset:0; background:rgba(20,28,40,.45); display:none; align-items:center; justify-content:center; z-index:80;}
   .modal.show{display:flex; animation:pop .18s ease;}
@@ -146,11 +140,52 @@
   .snap-row .snap-id{font-family:ui-monospace,Consolas,monospace; color:#7a4b00; background:#fff3e0; padding:1px 6px; border-radius:6px;}
   .snap-row .snap-meta{color:var(--muted); flex:1;}
   .snap-row .tool{padding:3px 8px; font-size:12px;}
+  /* ---------- 多端适配：平板 / 手机 / 窄屏 ---------- */
+  @media(max-width:1024px){
+    .page{max-width:100%;}
+    .tables{gap:16px;}
+    .doc-title{font-size:26px;}
+  }
   @media(max-width:860px){
     .tables{flex-direction:column;}
     /* 纵向排列时，flex-basis:0 会让栏目高度塌成 0 → 表格不可见；改回按内容自适应 */
     .verb-col{flex:0 0 auto; width:100%;}
-    .panel{right:8px; left:8px; width:auto;}
+    .topbar{padding:10px 12px; gap:8px; backdrop-filter:none; background:rgba(255,255,255,.96);}
+    .search{order:-1; flex:1 1 100%; min-width:0;}
+    .doc-title{font-size:23px; margin-bottom:16px;}
+    table{font-size:14px;}
+    tbody td{padding:9px 10px;}
+    .panel{
+      left:8px; right:8px; top:auto; bottom:0; width:auto;
+      max-height:88vh; border-radius:16px 16px 0 0;
+      padding-bottom:calc(18px + env(safe-area-inset-bottom));
+    }
+    .modal{align-items:flex-end;}
+    .modal-card{width:100%; max-width:none; border-radius:16px 16px 0 0; padding-bottom:calc(20px + env(safe-area-inset-bottom));}
+    .view-banner{font-size:12px; padding:8px 10px;}
+    .hint{font-size:12px;}
+    body{padding-bottom:calc(40px + env(safe-area-inset-bottom));}
+  }
+  @media(max-width:560px){
+    table{font-size:13px;}
+    tbody td{padding:8px 8px;}
+    thead th{padding:9px 8px; font-size:12px;}
+    .doc-title{font-size:20px;}
+    .doc-title span{font-size:11px; letter-spacing:1px;}
+    .tool{flex:1 1 auto; justify-content:center; padding:9px 8px;}
+    .brand{width:100%;}
+    .wf .spk{display:none;}
+    .act{width:34px;}
+    .snap-list{max-height:150px;}
+  }
+  /* 触屏设备：去掉悬停态，行末朗读键常显 */
+  @media(hover:none){
+    .wf:hover{background:transparent;}
+    .zh:hover{background:transparent;}
+    tbody tr:hover{background:#fafcff;}
+    tbody tr:nth-child(even):hover{background:#fafcff;}
+    .act button{opacity:.5;}
+    .tool:hover{transform:none;}
   }
 </style>
 </head>
@@ -172,10 +207,9 @@
     <h1 class="doc-title">Irregular Verbs<span>不 规 则 动 词 表</span></h1>
     <div class="tables" id="tables"></div>
     <div class="hint">
-      点击任意 <span class="tag" style="color:var(--base)">原形</span>
+      点 <span class="tag" style="color:var(--base)">原形</span>
       <span class="tag" style="color:var(--past)">过去式</span>
-      <span class="tag" style="color:var(--pp)">过去分词</span> 即可发音；
-      点击释义可听中文。悬停行右侧 ▶ 可朗读整行。
+      <span class="tag" style="color:var(--pp)">过去分词</span> 听发音，点释义听中文；行末 ▶ 朗读整行。
     </div>
   </div>
 
@@ -225,13 +259,10 @@
       <input id="rate" type="range" min="0.5" max="1.2" step="0.05" value="0.9">
       <span id="rateVal" style="font-size:12px;color:var(--muted)"></span>
     </div>
-    <div class="pmeta">发音优先使用浏览器内置语音（无需联网）；若浏览器不支持内置语音（常见于微信/QQ 内置浏览器），将自动改用在线发音，此时需联网。</div>
+    <div class="pmeta">电脑上用系统自带语音，不联网也能发音；在微信、QQ 里打开会自动换成在线发音，这时需要联网。</div>
   </div>
 
-  <div class="toast" id="toast"></div>
-
-  <!-- 导出鉴权弹窗 -->
-  <div class="modal" id="authModal">
+  <!-- 导出鉴权弹窗 -->  <div class="modal" id="authModal">
     <div class="modal-card" onclick="event.stopPropagation()">
       <h3>导出鉴权 <button class="x" onclick="closeAuth()">×</button></h3>
       <p class="pmeta">导出网页前需输入公钥与私钥，两者均正确方可导出。连续错误 3 次将禁用导出功能。</p>
@@ -246,12 +277,12 @@
   <div class="modal" id="shareModal">
     <div class="modal-card" onclick="event.stopPropagation()">
       <h3>分享 <button class="x" onclick="closeShare()">×</button></h3>
-      <p class="pmeta">复制链接发给同学，对方打开即可看到这份内容（数据在链接里，无需服务器）。打开分享<b>不会</b>改动你自己的版本。</p>
+      <p class="pmeta">把链接发给别人，对方打开就能看到这份表。对方打开时会自动和他自己的表做智能合并——他没有的词会补上，已有的词不动他的，不会互相覆盖。</p>
       <div class="field"><label>分享链接（已自动选中，Ctrl/⌘+C 复制）</label>
         <textarea id="shareUrl" rows="3" readonly onclick="this.select()"></textarea>
       </div>
       <button class="btn" onclick="copyShareUrl()">复制链接</button>
-      <div class="snap-head">分享记录（本机 · 按内容哈希存档，多个版本互不冲突）</div>
+      <div class="snap-head">分享记录（存在本机，回看或再复制）</div>
       <div id="snapList" class="snap-list"></div>
     </div>
   </div>
@@ -343,35 +374,66 @@
   /* ===== 分享快照：内容寻址仓库（按内容哈希生成稳定 id，类似 CDN 的 content-hash） ===== */
   function snapId(data){ return sha256(JSON.stringify(data)).slice(0,12); }
   function countOf(d){ return (d.L?d.L.length:0)+(d.R?d.R.length:0); }
-  // 打开一个分享快照为当前视图（绝不写入“我的版本”）
+  /* ===== 智能合并：以“我的版本”为基准，分享中新增的补进来，冲突项保留本地 ===== */
+  function smartMerge(mine, share){
+    const out = {L: mine.L.map(a=>a.slice()), R: mine.R.map(a=>a.slice())};
+    let added = 0, conflicts = 0;
+    const keyOf = a => String(a[0]||'').trim().toLowerCase();
+    const idx = {};                                    // 全局查重：key → [side, i]
+    ['L','R'].forEach(side=>{
+      out[side].forEach((a,i)=>{ const k=keyOf(a); if(k && !(k in idx)) idx[k]=[side,i]; });
+    });
+    ['L','R'].forEach(side=>{
+      (share[side]||[]).forEach(a=>{
+        const k = keyOf(a);
+        if(!k) return;
+        if(k in idx){
+          const [s,i] = idx[k];
+          const cur = out[s][i];
+          const same = String(cur[1]||'')===String(a[1]||'') && String(cur[2]||'')===String(a[2]||'');
+          if(!same) conflicts++;                       // 同原形、三态不同：保留本地，不动它
+        } else {
+          const target = out.L.length<=out.R.length ? 'L' : 'R';
+          out[target].push([a[0],a[1],a[2],a[3]||'']);
+          idx[k] = [target, out[target].length-1];
+          added++;
+        }
+      });
+    });
+    return { data: out, added, conflicts };
+  }
+  function clearHash(){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
+  // 打开一个分享快照为当前视图（只读，绝不写入“我的版本”）
   async function openSnapshot(data, persist){
     const id = snapId(data);
     VIEW = { kind:'snap', id };
     CURRENT = clone(data);
     if(persist){ try{ await snapSet({ id, ts:Date.now(), data:clone(data) }); }catch(e){} }
     render();
-    toast('已载入分享版本 #'+id+'（'+countOf(data)+' 条）· 你的个人版本未被改动');
   }
-  // 把当前（分享）视图保存为“我的版本”
-  function saveSnapshotAsMine(){
+  // 把当前（分享）视图智能合并进“我的版本”：本地优先，分享里的新词补进来
+  function mergeSnapshotToMine(){
+    const share = clone(CURRENT);
+    loadMine();                                   // CURRENT → 我的版本
+    const r = smartMerge(CURRENT, share);
+    CURRENT = r.data;
     saveMine();
     VIEW = { kind:'mine', id:null };
-    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+    clearHash();
     render();
-    toast('已保存为我的版本，后续编辑只影响你的版本');
   }
   // 回到“我的版本”
   function viewMine(){
     VIEW = { kind:'mine', id:null };
     loadMine();
-    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+    clearHash();
     render();
   }
-  // 编辑守卫：处于分享视图时，需先“保存为我的版本”，避免覆盖对方原始分享
+  // 编辑守卫：分享视图下先合并为我的版本，再编辑
   function ensureEditable(){
     if(VIEW.kind!=='snap') return true;
-    if(!confirm('你正在查看「分享版本」。\n要把它保存为“我的版本”后再编辑吗？（不会改动对方的原始分享）')) return false;
-    saveSnapshotAsMine();
+    if(!confirm('你正在看「分享版本」。先合并进你的表，再编辑吗？（你没有的词会补上，已有的不动）')) return false;
+    mergeSnapshotToMine();
     return true;
   }
 
@@ -412,18 +474,17 @@
     // 保持当前搜索过滤与视图切换兼容
     try{ const s=document.getElementById('search'); if(s) doSearch(s.value); }catch(e){}
   }
-  // 视图横幅：明确告知正在看“我的版本”还是“分享版本”，避免误解/冲突
+  // 视图横幅：只在看“分享版本”时出现，离开（合并/回我的表）即消失
   function showBanner(){
     const el=document.getElementById('viewBanner'); if(!el) return;
     if(VIEW.kind==='snap'){
       el.style.display='flex';
       el.innerHTML =
         `<span class="vb-ico">📄</span>
-         <span class="vb-txt">正在查看<b>分享版本 #${VIEW.id}</b>（${countOf(CURRENT)} 条）。<b>你的个人版本已保留、未被改动。</b></span>
+         <span class="vb-txt">正在看<b>分享版本 #${VIEW.id}</b>（${countOf(CURRENT)} 条）。你自己的表没有被动过。</span>
          <span class="vb-btns">
-           <button class="tool" onclick="saveSnapshotAsMine()">💾 保存为我的版本</button>
-           <button class="tool" onclick="oneClickShare()">🔗 复制此分享</button>
-           <button class="tool" onclick="viewMine()">↩ 看我的版本</button>
+           <button class="tool" onclick="mergeSnapshotToMine()">合并到我的表</button>
+           <button class="tool" onclick="viewMine()">看我的表</button>
          </span>`;
     } else {
       el.style.display='none';
@@ -570,7 +631,6 @@
       .filter(c=>{ const w=c.getAttribute('data-w'); return w && w!==SKIP; })
       .map(c=>({text:c.getAttribute('data-w'), lang:'en', el:c}));
     playSequence(items);
-    toast(`开始朗读全部：${items.length} 个单词`);
   }
   function stopSpeak(){
     speakToken++;
@@ -580,11 +640,15 @@
   }
 
   /* ---------- search ---------- */
+  let searchRaf = 0;
   function doSearch(q){
-    q=(q||'').trim().toLowerCase();
-    document.querySelectorAll('#tables tbody tr').forEach(tr=>{
-      const t = tr.textContent.toLowerCase();
-      tr.classList.toggle('hide', q!=='' && !t.includes(q));
+    if(searchRaf) return;                       // rAF 节流：连续输入只算一帧
+    searchRaf = requestAnimationFrame(()=>{
+      searchRaf = 0;
+      const s=(q||'').trim().toLowerCase();
+      document.querySelectorAll('#tables tbody tr').forEach(tr=>{
+        tr.classList.toggle('hide', s!=='' && !tr.textContent.toLowerCase().includes(s));
+      });
     });
   }
 
@@ -600,25 +664,44 @@
     document.getElementById('actToggle').style.color = showAction?'#fff':'var(--ink)';
   }
 
+  /* ---------- 轻量反馈（不弹窗）：输入框红框 / 编辑面板内一行文字 ---------- */
+  function flashError(el){
+    if(!el) return;
+    el.style.borderColor = '#d24b4b';
+    el.style.boxShadow = '0 0 0 3px rgba(210,75,75,.14)';
+    setTimeout(()=>{ el.style.borderColor=''; el.style.boxShadow=''; }, 1600);
+  }
+  let metaMsgTimer = 0;
+  function metaMsg(text, isErr){
+    const el=document.getElementById('editMeta'); if(!el) return;
+    el.dataset.keep = el.innerHTML;
+    el.innerHTML = `<span style="color:${isErr?'#d24b4b':'var(--accent)'}">${esc(text)}</span>`;
+    clearTimeout(metaMsgTimer);
+    metaMsgTimer = setTimeout(()=>{ if(el.dataset.keep!==undefined){ el.innerHTML = el.dataset.keep; delete el.dataset.keep; } }, 2600);
+  }
+
   /* ---------- add words ---------- */
   function addSingle(){
     if(!ensureEditable()) return;
-    const b=document.getElementById('n_base').value.trim();
-    if(!b){ toast('请填写原形'); return; }
-    const p=document.getElementById('n_past').value.trim()||b;
-    const pp=document.getElementById('n_pp').value.trim()||b;
-    const zh=document.getElementById('n_zh').value.trim();
+    const base=document.getElementById('n_base'), past=document.getElementById('n_past'),
+          pp=document.getElementById('n_pp'), zh=document.getElementById('n_zh');
+    const b=base.value.trim();
+    if(!b){ flashError(base); return; }
+    const p=past.value.trim()||b;
+    const ppp=pp.value.trim()||b;
+    const z=zh.value.trim();
     const side=document.getElementById('n_side').value;
     const target = side==='auto' ? (CURRENT.L.length<=CURRENT.R.length?'L':'R') : side;
-    CURRENT[target].push([b,p,pp,zh]);
+    CURRENT[target].push([b,p,ppp,z]);
     saveMine(); render();
-    ['n_base','n_past','n_pp','n_zh'].forEach(id=>document.getElementById(id).value='');
-    toast(`已添加「${b}」到${target==='L'?'左':'右'}栏`);
+    [base,past,pp,zh].forEach(i=>i.value='');
+    base.focus();
   }
   function addBatch(){
     if(!ensureEditable()) return;
-    const txt=document.getElementById('n_batch').value.trim();
-    if(!txt){ toast('请粘贴内容'); return; }
+    const ta=document.getElementById('n_batch');
+    const txt=ta.value.trim();
+    if(!txt){ flashError(ta); return; }
     let n=0;
     txt.split(/\n+/).forEach(line=>{
       const parts=line.trim().split(/\s+/);
@@ -627,17 +710,17 @@
       const target = CURRENT.L.length<=CURRENT.R.length?'L':'R';
       CURRENT[target].push([b,p,pp,zh]); n++;
     });
-    if(n===0){ toast('未解析到有效数据'); return; }
+    if(n===0){ flashError(ta); metaMsg('没解析到有效行，每行至少：原形 过去式 过去分词', true); return; }
     saveMine(); render();
-    document.getElementById('n_batch').value='';
-    toast(`批量添加 ${n} 条`);
+    ta.value='';
+    metaMsg(`加了 ${n} 条`);
   }
   function resetData(){
     if(!ensureEditable()) return;
     if(!confirm('确定要清空所有新增单词，恢复到原始表格吗？')) return;
     try{ localStorage.removeItem(KEY); }catch(e){}
     CURRENT = clone(DEFAULT_DATA); saveMine(); render();
-    toast('已恢复原始表格');
+    metaMsg('已恢复成原始表格');
   }
   function importJson(){
     if(!ensureEditable()) return;
@@ -649,8 +732,8 @@
         try{
           const d=JSON.parse(r.result);
           if(!d.L||!d.R) throw 0;
-          CURRENT=d; saveMine(); render(); toast('导入成功');
-        }catch(e){ toast('JSON 格式不正确'); }
+          CURRENT=d; saveMine(); render(); metaMsg('导入好了');
+        }catch(e){ metaMsg('这个 JSON 读不了，检查下格式', true); }
       };
       r.readAsText(f);
     };
@@ -725,15 +808,19 @@
     }catch(e){ return false; }
   }
 
+  function shakeExportBtn(){
+    const b=document.getElementById('exportBtn'); if(!b) return;
+    b.animate?.([{transform:'translateX(0)'},{transform:'translateX(-4px)'},{transform:'translateX(4px)'},{transform:'translateX(0)'}],{duration:220});
+  }
   function requestExport(){
-    if(isUser()){ toast('导出功能已被禁用'); return; }
+    if(isUser()){ shakeExportBtn(); return; }
     // 已验证作者：本地凭据有效 → 免输直接导出
     if(localAuthorValid()){ exportHtml(); return; }
     // 本地存有凭据但无效（被篡改）→ 判定为普通用户并禁用导出
     try{
       if(localStorage.getItem(CRED_KEY)){
         localStorage.setItem(ROLE_KEY,'user'); hideExportBtn();
-        toast('检测到无效凭据，导出功能已禁用'); return;
+        return;
       }
     }catch(e){}
     openAuth();
@@ -765,15 +852,20 @@
         try{ localStorage.setItem(ROLE_KEY,'user'); }catch(e){}
         closeAuth();
         hideExportBtn();
-        toast('连续错误 3 次，导出功能已禁用');
+        shakeExportBtn();
       } else {
-        document.getElementById('authErr').textContent='公钥或私钥错误，还剩 '+(3-n)+' 次机会';
+        document.getElementById('authErr').textContent='公钥或私钥不对，还能试 '+(3-n)+' 次';
       }
     }
   }
 
   function exportHtml(){
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+    // 导出前清掉运行时状态，别带进成品
+    try{
+      document.body.classList.remove('no-ws');
+      const vb=document.getElementById('viewBanner'); if(vb){ vb.style.display='none'; vb.innerHTML=''; }
+    }catch(e){}
     let html = document.documentElement.outerHTML;
     html = html.replace('let FORCE_DEFAULT = false;', 'let FORCE_DEFAULT = true;');
     html = html.replace(/const DEFAULT_DATA = [\s\S]*?;\n/, 'const DEFAULT_DATA = '+JSON.stringify(CURRENT)+';\n');
@@ -782,17 +874,9 @@
     a.href=URL.createObjectURL(blob);
     a.download='不规则动词表-点读版.html';
     a.click();
-    toast('已导出独立网页（含当前全部单词）');
   }
 
-  /* ---------- toast ---------- */
-  let toastTimer;
-  function toast(msg){
-    const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
-    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
-  }
-
-  /* ---------- 一键分享（纯静态：数据编码进链接；本地按内容哈希建快照仓库） ---------- */
+  /* ---------- 一键分享：短链接（差异编码 + deflate 压缩） + 智能合并 ---------- */
   function b64urlEncode(str){
     const b = btoa(unescape(encodeURIComponent(str)));
     return b.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
@@ -802,8 +886,99 @@
     while(s.length%4) s+='=';
     return decodeURIComponent(escape(atob(s)));
   }
+  /* 字节 <-> base64url（分块，避免大数组爆调用栈） */
+  function bytesToB64u(bytes){
+    let bin=''; const CH=0x8000;
+    for(let i=0;i<bytes.length;i+=CH) bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+CH));
+    return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function b64uToBytes(s){
+    s = s.replace(/-/g,'+').replace(/_/g,'/');
+    while(s.length%4) s+='=';
+    const bin=atob(s); const out=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+    return out;
+  }
+  const HAS_CS = (typeof CompressionStream!=='undefined') && (typeof DecompressionStream!=='undefined');
+  async function deflateRaw(bytes){
+    const cs=new CompressionStream('deflate-raw');
+    const w=cs.writable.getWriter(); w.write(bytes); w.close();
+    return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+  }
+  async function inflateRaw(bytes){
+    const ds=new DecompressionStream('deflate-raw');
+    const w=ds.writable.getWriter(); w.write(bytes); w.close();
+    return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+  }
+  /* 差异编码：相对内置默认表，只传“改动的行 + 新增的行”，链接能短一个量级 */
+  function buildPayload(data){
+    const sameRow = (a,b)=> a&&b&&a[0]===b[0]&&a[1]===b[1]&&a[2]===b[2]&&(a[3]||'')===(b[3]||'');
+    let full = false;
+    const mod=[], tail={L:[],R:[]};
+    ['L','R'].forEach(side=>{
+      const base=DEFAULT_DATA[side]||[], arr=data[side]||[];
+      if(arr.length < base.length) full = true;                 // 有删行：差异表达不了，走全量
+      for(let i=0;i<base.length;i++){
+        const a=arr[i];
+        if(!a){ full=true; break; }
+        if(!sameRow(a, base[i])) mod.push([side,i,[a[0],a[1],a[2],a[3]||'']]);
+      }
+      for(let i=base.length;i<arr.length;i++) tail[side].push(arr[i]);
+    });
+    if(full){
+      // 全量紧凑格式：L:词条\x1f词条…\x1d…\x1cR:…
+      let s='';
+      ['L','R'].forEach(side=>{
+        s += side+':'+(data[side]||[]).map(a=>[a[0],a[1],a[2],a[3]||''].join('\u001f')).join('\u001d')+'\u001c';
+      });
+      return { v:1, f:'p', s };
+    }
+    return { v:1, f:'d', mod, tail };
+  }
+  function applyPayload(p){
+    if(p.f==='p'){
+      const d={L:[],R:[]};
+      String(p.s||'').split('\u001c').forEach(seg=>{
+        const m=seg.match(/^([LR]):([\s\S]*)$/); if(!m) return;
+        const side=m[1];
+        if(m[2]) m[2].split('\u001d').forEach(rec=>{
+          const f=rec.split('\u001f');
+          if(f.length>=3) d[side].push([f[0],f[1],f[2],f[3]||'']);
+        });
+      });
+      return d;
+    }
+    const d={L:(DEFAULT_DATA.L||[]).map(a=>a.slice()), R:(DEFAULT_DATA.R||[]).map(a=>a.slice())};
+    (p.mod||[]).forEach(m=>{ const [side,i,a]=m; if(d[side]&&d[side][i]) d[side][i]=[a[0],a[1],a[2],a[3]||'']; });
+    ['L','R'].forEach(side=> ((p.tail||{})[side]||[]).forEach(a=>{ if(a) d[side].push([a[0],a[1],a[2],a[3]||'']); }));
+    return d;
+  }
+  async function encodeShare(data){
+    const json = JSON.stringify(buildPayload(data));
+    if(HAS_CS){
+      try{
+        const bytes = new TextEncoder().encode(json);
+        const z = await deflateRaw(bytes);
+        if(z.length < bytes.length) return 'z'+bytesToB64u(z);      // 压缩更短才用
+      }catch(e){}
+    }
+    return 'r'+b64urlEncode(json);
+  }
+  async function decodeShare(s){
+    if(!s) throw new Error('empty');
+    const pre=s[0], body=s.slice(1);
+    if(pre==='z'){
+      const json = new TextDecoder().decode(await inflateRaw(b64uToBytes(body)));
+      return applyPayload(JSON.parse(json));
+    }
+    if(pre==='r') return applyPayload(JSON.parse(b64urlDecode(body)));
+    // 旧格式兼容：整份数据的 base64(JSON)
+    const d=JSON.parse(b64urlDecode(s));
+    if(!d.L||!d.R) throw new Error('bad shape');
+    return d;
+  }
   function baseUrl(){ return location.href.split('#')[0]; }
-  function shareLink(data){ return baseUrl() + '#d=' + b64urlEncode(JSON.stringify(data||CURRENT)); }
+  async function shareLink(data){ return baseUrl() + '#d=' + await encodeShare(data||CURRENT); }
   async function copyText(t){
     try{ await navigator.clipboard.writeText(t); return true; }
     catch(e){
@@ -812,11 +987,11 @@
     }
   }
   async function oneClickShare(){
-    if(VIEW.kind==='mine') saveMine();     // 仅“我的版本”才需要先落库；分享视图直接分享当前内容
-    const link = shareLink();
+    if(VIEW.kind==='mine') saveMine();     // 分享视图直接分享当前内容
+    try{ await snapSet({ id:snapId(CURRENT), ts:Date.now(), data:clone(CURRENT) }); }catch(e){}
+    const link = await shareLink();
     const ok = await copyText(link);
-    if(ok){ toast('🔗 分享链接已复制（版本 #'+snapId(CURRENT)+'）'); }
-    else { openShareModal(link); }
+    if(!ok) openShareModal(link);          // 复制失败才弹窗，让人手动复制
   }
   function openShareModal(link){
     const ta=document.getElementById('shareUrl'); if(ta) ta.value=link;
@@ -827,13 +1002,13 @@
   try{ document.getElementById('shareModal').addEventListener('click', closeShare); }catch(e){}
   function copyShareUrl(){
     const ta=document.getElementById('shareUrl'); if(ta) ta.select();
-    copyText(ta.value).then(ok=> toast(ok?'已复制链接':'请手动复制选中内容'));
+    copyText(ta.value);                    // 失败时弹窗还开着，手动复制即可
   }
-  // 分享记录（本地内容寻址快照仓库）——可回看/复制，多个版本互不冲突
+  // 分享记录（本机内容寻址快照仓库）——可回看/复制，多个版本互不冲突
   async function renderSnapList(){
     const box=document.getElementById('snapList'); if(!box) return;
     const list=await snapList();
-    if(!list.length){ box.innerHTML='<div class="pmeta">暂无分享记录。点“一键分享”后，对方或你打开过的版本会按内容哈希存档在这里，可随时回看。</div>'; return; }
+    if(!list.length){ box.innerHTML='<div class="pmeta">还没有分享记录。分享过的版本会存在这里，以后想回看、想再复制链接都方便。</div>'; return; }
     box.innerHTML = list.map(r=>{
       const t=new Date(r.ts); const tt=`${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       return `<div class="snap-row">
@@ -845,48 +1020,34 @@
     }).join('');
   }
   async function reopenSnap(id){
-    const rec=await snapGet(id); if(!rec||!rec.data){ toast('该版本已不存在'); return; }
-    try{ history.replaceState(null,'', baseUrl()+'#d='+b64urlEncode(JSON.stringify(rec.data))); }catch(e){}
+    const rec=await snapGet(id); if(!rec||!rec.data) return;
     closeShare();
+    try{ history.replaceState(null,'', baseUrl()+'#d='+await encodeShare(rec.data)); }catch(e){}
     openSnapshot(rec.data, false);
   }
   async function copySnapLink(id){
-    const rec=await snapGet(id); if(!rec||!rec.data){ toast('该版本已不存在'); return; }
-    const ok=await copyText(shareLink(rec.data));
-    toast(ok?('已复制 #'+id+' 的链接'):'请手动复制');
+    const rec=await snapGet(id); if(!rec||!rec.data) return;
+    const link = await shareLink(rec.data);
+    if(!(await copyText(link))) openShareModal(link);
   }
-  // 载入分享链接：只进“分享版本”视图，绝不覆盖“我的版本”，且保留哈希以便刷新
-  async function applySharedHash(){
+  // 载入分享链接：与“我的版本”智能合并（不覆盖），原文进快照仓库，然后清掉哈希
+  async function applySharedLink(){
     const m = location.hash.match(/d=([^&]+)/);
-    if(!m) return false;
-    try{
-      const d = JSON.parse(b64urlDecode(m[1]));
-      if(!d.L||!d.R) throw new Error('bad shape');
-      await openSnapshot(d, true);
-      return true;
-    }catch(e){
-      console.warn('分享链接解析失败', e);
-      toast('⚠️ 分享链接已损坏或被聊天软件截断，请让对方重新复制完整链接');
-      return false;
-    }
+    if(!m) return;
+    let share=null;
+    try{ share = await decodeShare(m[1]); }catch(e){ share=null; }
+    if(!share || !share.L || !share.R){ clearHash(); return; }   // 链接坏了：静默回到我的表
+    try{ await snapSet({ id:snapId(share), ts:Date.now(), data:clone(share) }); }catch(e){}
+    const r = smartMerge(CURRENT, share);
+    CURRENT = r.data;
+    saveMine();
+    VIEW = { kind:'mine', id:null };
+    clearHash();
+    render();
   }
 
   /* ---------- init ---------- */
-  async function boot(){
-    // 先初始化 SQLite WASM 持久化（异步；失败自动回退 localStorage）
-    await initStorage();
-    // 视图解析：链接带 #d= → 打开“分享版本”（绝不覆盖我的版本，且保留哈希以便刷新）；
-    //            否则 → 打开“我的版本”。
-    if(/#d=/.test(location.hash)){
-      try{ await applySharedHash(); }catch(e){}
-      if(VIEW.kind!=='snap'){ VIEW={kind:'mine',id:null}; loadMine(); }
-    } else {
-      VIEW = { kind:'mine', id:null };
-      loadMine();
-    }
-    // 先渲染表格，确保即使语音相关代码异常，内容也始终可见（避免整页空白）
-    render();
-    if(isUser()){ hideExportBtn(); }
+  function initSpeechUI(){
     try{
       const r=document.getElementById('rate');
       if(r){
@@ -898,11 +1059,29 @@
         speechSynthesis.onvoiceschanged = loadVoices;
       } else {
         document.body.classList.add('no-ws');   // 无内置语音 → 走在线发音兜底
-        toast('本机浏览器内置语音不可用，已自动切换为在线发音（需联网）');
       }
     }catch(e){
       console.error('语音初始化异常（不影响表格显示）:', e);
     }
+  }
+  function boot(){
+    // 1) 首屏：同步取本地数据并渲染，SQLite WASM 不挡首屏
+    VIEW = { kind:'mine', id:null };
+    loadMine();
+    render();
+    if(isUser()){ hideExportBtn(); }
+    initSpeechUI();
+    // 2) 后台初始化 SQLite；就绪后以库里的数据为准，再处理分享链接（智能合并）
+    Promise.resolve()
+      .then(initStorage)
+      .then(()=>{
+        if(storageMode==='sqlite' && DB){
+          const d = loadFromDB();
+          if(d && JSON.stringify(d)!==JSON.stringify(CURRENT)){ CURRENT=d; render(); }
+        }
+        if(location.hash.indexOf('#d=')>=0) return applySharedLink();
+      })
+      .catch(e=>{ console.warn('初始化异常（不影响表格显示）:', e); });
   }
   boot();
   // 兜底：若 1 秒后表格仍为空（极端异常），强制重渲染，避免白屏
